@@ -104,8 +104,8 @@ int main() {
           msgJson["throttle"] = throttle_value;
 
           // Display the MPC predicted trajectory 
-          vector<double> mpc_x_vals = mpc.mpc_x;
-          vector<double> mpc_y_vals = mpc.mpc_y;
+          vector<double> mpc_x_vals = mpc.GetMPCX();
+          vector<double> mpc_y_vals = mpc.GetMPCY();
 
           /**
            * add (x,y) points to list here, points are in reference to 

@@ -306,11 +306,11 @@ std::vector<double> MPC::Solve(const VectorXd &state, const VectorXd &coeffs) {
    *   creates a 2 element double vector.
    */
 
-  mpc_x.clear();
-  mpc_y.clear();
+  mpc_x_.clear();
+  mpc_y_.clear();
   for (int i=0; i<N; ++i) {
-    mpc_x.push_back(solution.x[x_start+i]);
-    mpc_y.push_back(solution.x[y_start+i]);
+    mpc_x_.push_back(solution.x[x_start+i]);
+    mpc_y_.push_back(solution.x[y_start+i]);
   }
   return {solution.x[delta_start], solution.x[a_start]};
 }
