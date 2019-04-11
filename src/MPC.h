@@ -7,8 +7,9 @@
 class MPC {
  public:
   MPC();
-
   virtual ~MPC();
+  std::vector<double> mpc_x;
+  std::vector<double> mpc_y;
 
   // Solve the model given an initial state and polynomial coefficients.
   // Return the first actuations.

@@ -1,7 +1,9 @@
 #ifndef HELPERS_H
 #define HELPERS_H
 
+#include <math.h>
 #include <string>
+#include <vector>
 #include "Eigen-3.3/Eigen/Core"
 
 using Eigen::VectorXd;
@@ -58,6 +60,24 @@ VectorXd polyfit(const VectorXd &xvals, const VectorXd &yvals, int order) {
   auto result = Q.solve(yvals);
 
   return result;
+}
+
+// Transform from global coordinate system to vehicle's coordinate system
+void global_to_vehicle(std::vector<double> &ptsx,
+                      std::vector<double> &ptsy,
+                      double px,
+                      double py,
+                      double psi,
+                      VectorXd &vehicle_ptsx,
+                      VectorXd &vehicle_ptsy) {
+  double x, y;
+  for (size_t i=0; i<ptsx.size(); ++i) {
+    x = ptsx[i] - px;
+    y = ptsy[i] - py;
+
+    vehicle_ptsx[i] = x * cos(-psi) - y * sin(-psi);
+    vehicle_ptsy[i] = x * sin(-psi) + y * cos(-psi);
+  }
 }
 
 #endif  // HELPERS_H

@@ -27,7 +27,10 @@ int main() {
   // MPC is initialized here!
   MPC mpc;
 
-  h.onMessage([&mpc](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  // System characteristic, in second
+  double delay = 0.1;
+
+  h.onMessage([&mpc, &delay](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -47,13 +50,51 @@ int main() {
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
+          double steering_angle = j[1]["steering_angle"];
+          double throttle = j[1]["throttle"];
+
+          // declare variables
+          Eigen::VectorXd vehicle_ptsx(ptsx.size());
+          Eigen::VectorXd vehicle_ptxy(ptsx.size());
+  
+          // Declare state vector
+          Eigen::VectorXd state(8);
+
+          // transform coordinate of waypoints from global to vehicle
+          global_to_vehicle(ptsx, ptsy, px, py, psi, vehicle_ptsx, vehicle_ptxy);
+
+          // get coeffs
+          auto coeffs = polyfit(vehicle_ptsx, vehicle_ptxy, 3);
+
+          // we have to deal with 100ms delay, so look for the cte 200ms seconds ahead.
+          double pxahead = v * 2 * delay;
+
+          // calculate the cross track error
+          // double cte = polyeval(coeffs, pahead) - py;
+          // py should be 0 in vehicle's coordinate system.
+          double cte = polyeval(coeffs, pxahead);
+
+          // calculate the orientation error
+          // double epsi = psi - atan(coeffs[1] + 2*coeffs[2]*px)
+          // In vehicle's coordinate system, px = 0, psi = 0, hence:
+          double epsi = -atan(coeffs[1]);
+
+          // update state
+          // px, py, psi, v, cte, epsi
+          state << 0, 0, 0, v, cte, epsi, -steering_angle, throttle;
 
           /**
-           * TODO: Calculate steering angle and throttle using MPC.
+           * Calculate steering angle and throttle using MPC.
            * Both are in between [-1, 1].
            */
           double steer_value;
           double throttle_value;
+
+          auto ret = mpc.Solve(state, coeffs);
+
+          // Assign MPC result to target variables
+          steer_value = -ret[0] / (2.67*deg2rad(25));
+          throttle_value = ret[1];
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the 
@@ -63,15 +104,14 @@ int main() {
           msgJson["throttle"] = throttle_value;
 
           // Display the MPC predicted trajectory 
-          vector<double> mpc_x_vals;
-          vector<double> mpc_y_vals;
+          vector<double> mpc_x_vals = mpc.mpc_x;
+          vector<double> mpc_y_vals = mpc.mpc_y;
 
           /**
-           * TODO: add (x,y) points to list here, points are in reference to 
+           * add (x,y) points to list here, points are in reference to 
            *   the vehicle's coordinate system the points in the simulator are 
            *   connected by a Green line
            */
-
           msgJson["mpc_x"] = mpc_x_vals;
           msgJson["mpc_y"] = mpc_y_vals;
 
@@ -80,17 +120,21 @@ int main() {
           vector<double> next_y_vals;
 
           /**
-           * TODO: add (x,y) points to list here, points are in reference to 
+           * add (x,y) points to list here, points are in reference to 
            *   the vehicle's coordinate system the points in the simulator are 
            *   connected by a Yellow line
            */
 
+          for (int i=0; i<vehicle_ptsx.size(); ++i) {
+            next_x_vals.push_back(vehicle_ptsx[i]);
+            next_y_vals.push_back(polyeval(coeffs, vehicle_ptsx[i]));
+          }
+
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;
 
-
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
+          // std::cout << msg << std::endl;
           // Latency
           // The purpose is to mimic real driving conditions where
           //   the car does actuate the commands instantly.
@@ -99,7 +143,7 @@ int main() {
           //   around the track with 100ms latency.
           //
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE SUBMITTING.
-          std::this_thread::sleep_for(std::chrono::milliseconds(100));
+          std::this_thread::sleep_for(std::chrono::milliseconds(int(delay*1000)));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }  // end "telemetry" if
       } else {
